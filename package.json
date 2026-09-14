@@ -1,0 +1,8 @@
+{
+  "name": "gen-z-news-content-factory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"build": "node scripts/build.mjs", "check": "node --check web/app.js && node --check web/api.js", "test": "python3 -m unittest discover -s tests -v"},
+  "engines": {"node": ">=22"}
+}
