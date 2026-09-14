@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
-from worker.factory import parse_feed, fingerprint, public_addresses, fetch_feed, validate_script, captions, ass_time, render, probe
+from worker.factory import parse_feed, fingerprint, public_addresses, fetch_feed, validate_script, captions, ass_time, alignment_words, render, probe
 
 class FactoryTests(unittest.TestCase):
     def setUp(self):
@@ -38,6 +38,18 @@ class FactoryTests(unittest.TestCase):
         validate_script(script,{'body':self.body})
         script['sentences'][0]['evidence']='Fakta ini tidak ada dalam sumber.'
         with self.assertRaises(ValueError):validate_script(script,{'body':self.body})
+    def test_character_alignment_becomes_word_timestamps(self):
+        alignment={
+          'characters':list('Halo dunia!'),
+          'character_start_times_seconds':[i/10 for i in range(11)],
+          'character_end_times_seconds':[(i+1)/10 for i in range(11)]
+        }
+        self.assertEqual(alignment_words(alignment),[
+          {'word':'Halo','start':0.0,'end':0.4},
+          {'word':'dunia!','start':0.5,'end':1.1}
+        ])
+        with self.assertRaises(ValueError): alignment_words({'characters':['x'],'character_start_times_seconds':[],'character_end_times_seconds':[]})
+
     def test_caption_escaping_and_timing(self):
         output=captions([{'word':'{\\an8}test','start':0,'end':1}], 'Judul','Sumber',2)
         self.assertNotIn('{\\an8}',output)
