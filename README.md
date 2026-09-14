@@ -23,14 +23,15 @@ Tanpa environment Supabase, dashboard menampilkan **mode demo dengan data ilustr
 - Deduplikasi judul exact dan near-duplicate (bukan semantic clustering lintas media).
 - Queue claim atomik; job status, retry manual, output tersimpan.
 - Script dengan evidence kutipan sumber dan pemeriksaan kesetiaan sumber oleh AI.
-- OpenAI TTS, timestamp kata via Whisper, subtitle ASS, FFmpeg H.264/AAC 1080×1920.
+- Default free-first: Gemini Flash-Lite untuk script dan ElevenLabs with-timestamps untuk dubbing + timing caption; OpenAI tetap opsional.
+- Subtitle ASS dan render lokal FFmpeg H.264/AAC 1080×1920.
 - Scan sekaligus auto-enqueue maksimal tiga artikel yang belum diproduksi.
 - Worker Docker dan CI build + unit/integration tests tanpa API key.
 
 ## Belum dinyatakan live
 
-- Netlify dan Supabase belum diprovision dalam repository ini.
-- OpenAI live, database RLS pada project nyata, login, upload/download storage perlu UAT setelah credentials terpasang.
+- Netlify dan Supabase sudah dipasang pengguna; login dan upload gameplay sudah lolos smoke test manual.
+- Gemini/ElevenLabs live, scan RSS, queue, render, dan download output masih perlu UAT memakai kredensial trial lokal.
 - RSS Detik, Kompas, Kumparan belum dikonfigurasi atau diuji. Tidak ada klaim akses seluruh portal.
 - Scraping full article, cross-source fact verification, semantic clustering, auto-post TikTok, analytics dan penjadwal UI belum diimplementasikan.
 - Worker berjalan single instance per owner. Jadwal dapat dijalankan oleh scheduler eksternal melalui CLI.
@@ -47,7 +48,9 @@ Frontend memakai HTML/CSS/ES modules tanpa dependency npm runtime; build Node me
 
 ## Sumber dokumentasi API
 
-- [OpenAI TTS](https://developers.openai.com/api/docs/guides/text-to-speech)
-- [OpenAI speech-to-text](https://developers.openai.com/api/docs/guides/speech-to-text)
+- [Gemini Developer API pricing](https://ai.google.dev/gemini-api/docs/pricing)
+- [Gemini generateContent](https://ai.google.dev/api/generate-content)
+- [ElevenLabs speech with timing](https://elevenlabs.io/docs/api-reference/text-to-speech/convert-with-timestamps)
+- [OpenAI TTS (opsional)](https://developers.openai.com/api/docs/guides/text-to-speech)
 - [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - [Netlify file configuration](https://docs.netlify.com/build/configure-builds/file-based-configuration/)
