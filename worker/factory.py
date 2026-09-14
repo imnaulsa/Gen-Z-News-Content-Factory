@@ -119,9 +119,18 @@ class Client:
           'POST',{'contents':[{'parts':[{'text':prompt}]}],'generationConfig':{'responseMimeType':'application/json','temperature':0.2}},
           {'x-goog-api-key':os.environ['GEMINI_API_KEY'],'Content-Type':'application/json'})
         parts=result.get('candidates',[{}])[0].get('content',{}).get('parts',[])
-        text=''.join(str(part.get('text','')) for part in parts).strip()
-        if not text: raise ValueError('Gemini tidak mengembalikan JSON.')
-        return json.loads(re.sub(r'^\x60\x60\x60(?:json)?|\x60\x60\x60(self,bucket,path,body=None):
+        response_text=''.join(str(part.get('text','')) for part in parts).strip()
+        if not response_text: raise ValueError('Gemini tidak mengembalikan JSON.')
+        if response_text.startswith('```'):
+            response_text=re.sub(r'^```(?:json)?\s*|\s*```\s*$','',response_text,flags=re.I)
+        return json.loads(response_text)
+    def elevenlabs(self,text):
+        voice=urllib.parse.quote(os.environ['ELEVENLABS_VOICE_ID'],safe='')
+        return self.request(
+          f'https://api.elevenlabs.io/v1/text-to-speech/{voice}/with-timestamps?output_format=mp3_44100_128',
+          'POST',{'text':text,'model_id':os.getenv('ELEVENLABS_MODEL_ID','eleven_multilingual_v2')},
+          {'xi-api-key':os.environ['ELEVENLABS_API_KEY'],'Content-Type':'application/json'},limit=30_000_000)
+    def storage(self,bucket,path,body=None):
         if not path.startswith(self.owner+'/') or '..' in path: raise ValueError('Path asset tidak valid.')
         safe=urllib.parse.quote(path,safe='/')
         return self.request(self.url+'/storage/v1/object/'+bucket+'/'+safe,'POST' if body is not None else 'GET',body,{'apikey':self.key,'Authorization':'Bearer '+self.key,'Content-Type':'video/mp4','x-upsert':'true'},body is None)
