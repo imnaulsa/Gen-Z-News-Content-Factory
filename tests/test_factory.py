@@ -1,11 +1,15 @@
+import asyncio
 import datetime as dt
+import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
-from worker.factory import parse_feed, fingerprint, public_addresses, fetch_feed, validate_script, captions, ass_time, alignment_words, render, probe
+from worker.factory import parse_feed, fingerprint, public_addresses, fetch_feed, validate_script, captions, ass_time, alignment_words, edge_speech, render, probe
 
 class FactoryTests(unittest.TestCase):
     def setUp(self):
@@ -49,6 +53,20 @@ class FactoryTests(unittest.TestCase):
           {'word':'dunia!','start':0.5,'end':1.1}
         ])
         with self.assertRaises(ValueError): alignment_words({'characters':['x'],'character_start_times_seconds':[],'character_end_times_seconds':[]})
+
+    def test_edge_tts_audio_timing_and_legacy_voice_fallback(self):
+        selected={}
+        class FakeCommunicate:
+            def __init__(self,text,voice,**options): selected['voice']=voice
+            async def stream(self):
+                yield {'type':'audio','data':b'mp3'}
+                yield {'type':'WordBoundary','text':'Halo','offset':10_000_000,'duration':5_000_000}
+        fake=SimpleNamespace(Communicate=FakeCommunicate)
+        with patch.dict(sys.modules,{'edge_tts':fake}),patch.dict(os.environ,{'EDGE_TTS_VOICE':'id-ID-ArdiNeural'}):
+            audio,words=asyncio.run(edge_speech('Halo','alloy'))
+        self.assertEqual(selected['voice'],'id-ID-ArdiNeural')
+        self.assertEqual(audio,b'mp3')
+        self.assertEqual(words,[{'word':'Halo','start':1.0,'end':1.5}])
 
     def test_caption_escaping_and_timing(self):
         output=captions([{'word':'{\\an8}test','start':0,'end':1}], 'Judul','Sumber',2)

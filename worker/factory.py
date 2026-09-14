@@ -1,7 +1,8 @@
 """Single-purpose worker: Supabase queue -> news/script/TTS/captions/FFmpeg.
-Python 3.12+ standard library only. Run one worker instance per owner.
+Run one Python 3.12+ worker instance per owner.
 """
 import argparse
+import asyncio
 import base64
 import datetime as dt
 import difflib
@@ -245,6 +246,31 @@ def alignment_words(alignment):
     flush()
     return words
 
+EDGE_TTS_VOICES={'id-ID-ArdiNeural','id-ID-GadisNeural'}
+
+async def edge_speech(text,voice):
+    """Return MP3 bytes and Edge word-boundary timings without an API key."""
+    try:
+        import edge_tts
+    except ImportError as exc:
+        raise ValueError('Paket edge-tts belum terpasang di image worker. Rebuild Docker image.') from exc
+    selected=voice if voice in EDGE_TTS_VOICES else os.getenv('EDGE_TTS_VOICE','id-ID-ArdiNeural')
+    if selected not in EDGE_TTS_VOICES: raise ValueError('EDGE_TTS_VOICE harus Ardi atau Gadis Indonesia.')
+    communicate=edge_tts.Communicate(
+      text,selected,
+      rate=os.getenv('EDGE_TTS_RATE','+0%'),
+      volume=os.getenv('EDGE_TTS_VOLUME','+0%'),
+      pitch=os.getenv('EDGE_TTS_PITCH','+0Hz'))
+    audio=bytearray();words=[]
+    async for chunk in communicate.stream():
+        if chunk['type']=='audio': audio.extend(chunk['data'])
+        elif chunk['type']=='WordBoundary':
+            start=float(chunk['offset'])/10_000_000
+            words.append({'word':str(chunk['text']),'start':start,'end':start+float(chunk['duration'])/10_000_000})
+    if not audio: raise ValueError('Edge TTS tidak mengembalikan audio.')
+    if not words: raise ValueError('Edge TTS tidak mengembalikan timestamp kata.')
+    return bytes(audio),words
+
 def transcribe(client,audio):
     boundary='genz'+uuid.uuid4().hex
     parts=[]
@@ -255,7 +281,8 @@ def transcribe(client,audio):
     return client.openai('audio/transcriptions',b''.join(parts),'multipart/form-data; boundary='+boundary)
 
 def synthesize(client,spoken,voice):
-    provider=os.getenv('TTS_PROVIDER','elevenlabs').lower()
+    provider=os.getenv('TTS_PROVIDER','edge').lower()
+    if provider=='edge': return asyncio.run(edge_speech(spoken,voice))
     if provider=='elevenlabs':
         result=client.elevenlabs(spoken)
         try: audio=base64.b64decode(result['audio_base64'],validate=True)
@@ -265,7 +292,7 @@ def synthesize(client,spoken,voice):
     if provider=='openai':
         audio=client.openai('audio/speech',{'model':os.getenv('OPENAI_TTS_MODEL','gpt-4o-mini-tts'),'voice':voice,'input':spoken,'instructions':'Baca Bahasa Indonesia dengan natural, jelas, santai dan tidak berlebihan.','response_format':'mp3'},binary=True)
         return audio,transcribe(client,audio).get('words',[])
-    raise ValueError('TTS_PROVIDER harus elevenlabs atau openai.')
+    raise ValueError('TTS_PROVIDER harus edge, elevenlabs, atau openai.')
 
 def probe(path):
     r=subprocess.run(['ffprobe','-v','error','-show_format','-show_streams','-of','json',str(path)],capture_output=True,text=True,timeout=30,check=True)
@@ -283,7 +310,7 @@ def produce(client,job):
     attempts=client.owned('jobs','kind=eq.produce&started_at=gte.'+urllib.parse.quote(midnight.isoformat())+'&select=id&limit=100')
     if len(attempts)>limit: raise ValueError('Batas percobaan produksi harian tercapai. Coba besok atau ubah MAX_VIDEOS_PER_DAY.')
     text_provider=os.getenv('TEXT_PROVIDER','gemini').lower()
-    tts_provider=os.getenv('TTS_PROVIDER','elevenlabs').lower()
+    tts_provider=os.getenv('TTS_PROVIDER','edge').lower()
     if text_provider=='gemini' and not os.getenv('GEMINI_API_KEY'): raise ValueError('GEMINI_API_KEY belum dipasang di worker.')
     if tts_provider=='elevenlabs' and (not os.getenv('ELEVENLABS_API_KEY') or not os.getenv('ELEVENLABS_VOICE_ID')): raise ValueError('ELEVENLABS_API_KEY dan ELEVENLABS_VOICE_ID wajib di worker.')
     if 'openai' in (text_provider,tts_provider) and not os.getenv('OPENAI_API_KEY'): raise ValueError('OPENAI_API_KEY belum dipasang di worker.')

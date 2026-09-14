@@ -42,12 +42,11 @@ Script default memakai Gemini Developer API free tier:
 2. Buat key pada project khusus trial, lalu isi `GEMINI_API_KEY` di file `.env` lokal.
 3. Default worker memakai `gemini-3.5-flash-lite`. Free tier memiliki kuota/rate limit dan data dapat digunakan Google untuk meningkatkan produknya, jadi kirim hanya materi berita publik.
 
-Suara default memakai ElevenLabs:
+Suara default memakai Edge TTS melalui worker lokal dan tidak memerlukan API key. Default-nya
+`id-ID-ArdiNeural`; alternatif suara wanita adalah `id-ID-GadisNeural`.
 
-1. Buat akun free dan API key, lalu isi `ELEVENLABS_API_KEY`.
-2. Pilih voice di Voice Library/My Voices, salin Voice ID, lalu isi `ELEVENLABS_VOICE_ID`.
-3. Worker memakai endpoint with-timestamps: satu request menghasilkan MP3 dan timing caption, tanpa API transkripsi kedua.
-4. Hasil free plan hanya untuk trial/non-commercial. Sebelum dipublikasikan atau dimonetisasi, cek lisensi terbaru dan pindah ke paket yang memberi commercial license.
+ElevenLabs tetap tersedia sebagai opsi berbayar: ubah `TTS_PROVIDER=elevenlabs`, isi API key dan
+Voice ID, lalu pastikan saldo ElevenAPI tersedia serta key memiliki akses Text to Speech.
 
 OpenAI masih didukung sebagai opsi kemudian: set `TEXT_PROVIDER=openai` dan/atau `TTS_PROVIDER=openai`, isi `OPENAI_API_KEY`, lalu gunakan model di `.env`.
 
@@ -75,9 +74,10 @@ Untuk menjalankan lagi setelah container berhenti: `docker start -a genz-factory
 | `TEXT_PROVIDER` | Default `gemini` |
 | `GEMINI_API_KEY` | Key Google AI Studio |
 | `GEMINI_TEXT_MODEL` | Default `gemini-3.5-flash-lite` |
-| `TTS_PROVIDER` | Default `elevenlabs` |
-| `ELEVENLABS_API_KEY` | Key ElevenLabs trial |
-| `ELEVENLABS_VOICE_ID` | Voice ID yang dipilih |
+| `TTS_PROVIDER` | Default `edge` |
+| `EDGE_TTS_VOICE` | Default `id-ID-ArdiNeural` |
+| `ELEVENLABS_API_KEY` | Opsional; key ElevenLabs berbayar |
+| `ELEVENLABS_VOICE_ID` | Opsional; Voice ID ElevenLabs |
 | `ELEVENLABS_MODEL_ID` | Default `eleven_multilingual_v2` |
 | `MAX_VIDEOS_PER_DAY` | Default 3 percobaan; termasuk gagal, hari WIB |
 | `POLL_SECONDS` | Default 10 detik |
