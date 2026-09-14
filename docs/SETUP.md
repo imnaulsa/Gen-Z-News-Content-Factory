@@ -32,33 +32,57 @@ insert into public.factory_members(user_id) values ('GANTI_DENGAN_UID_USER');
 7. Tambahkan URL Netlify ke Auth Site URL / redirect allowlist untuk alur auth yang mungkin ditambahkan kemudian. Login versi ini memakai email/password.
 8. Storage `gameplay` (50 MB) dan `renders` (200 MB) private dibuat oleh SQL. Jangan ubah menjadi public.
 
-## 3. OpenAI
+## 3. API free-first untuk trial
 
-Siapkan API project dengan billing dan batas budget. Langganan ChatGPT tidak menjadi kredensial API worker. Simpan API key hanya di environment worker. Model default configurable: `gpt-4.1-mini`, `gpt-4o-mini-tts`, dan transkripsi `whisper-1` untuk word timestamps. Jika model tidak tersedia pada API project, pilih model kompatibel lalu uji kembali. Jangan menganggap kualitas bahasa Indonesia telah tervalidasi sebelum mendengarkan hasil nyata.
+Untuk tahap uji coba, berita masuk lewat RSS/Atom sehingga tidak memerlukan news API key. Masukkan feed HTTPS resmi di menu News sources. Worker hanya menyimpan ringkasan/feed body, judul, tanggal, dan tautan sumber; RSS yang hanya memberi cuplikan kurang dari 300 karakter sengaja dilewati agar AI tidak mengarang isi.
 
-## 4. Worker render
+Script default memakai Gemini Developer API free tier:
 
-Dashboard di Netlify; worker Docker berjalan di server/container yang mendukung proses background terus-menerus dan FFmpeg (misalnya VPS sendiri). Pilih host dan budget bersama pengguna sebelum provisioning layanan berbayar. Untuk testing juga dapat dijalankan di laptop yang memiliki Docker.
+1. Buka Google AI Studio → Get API key.
+2. Buat key pada project khusus trial, lalu isi `GEMINI_API_KEY` di file `.env` lokal.
+3. Default worker memakai `gemini-3.5-flash-lite`. Free tier memiliki kuota/rate limit dan data dapat digunakan Google untuk meningkatkan produknya, jadi kirim hanya materi berita publik.
+
+Suara default memakai ElevenLabs:
+
+1. Buat akun free dan API key, lalu isi `ELEVENLABS_API_KEY`.
+2. Pilih voice di Voice Library/My Voices, salin Voice ID, lalu isi `ELEVENLABS_VOICE_ID`.
+3. Worker memakai endpoint with-timestamps: satu request menghasilkan MP3 dan timing caption, tanpa API transkripsi kedua.
+4. Hasil free plan hanya untuk trial/non-commercial. Sebelum dipublikasikan atau dimonetisasi, cek lisensi terbaru dan pindah ke paket yang memberi commercial license.
+
+OpenAI masih didukung sebagai opsi kemudian: set `TEXT_PROVIDER=openai` dan/atau `TTS_PROVIDER=openai`, isi `OPENAI_API_KEY`, lalu gunakan model di `.env`.
+
+## 4. Worker render lokal
+
+Dashboard tetap di Netlify, sedangkan AI call dan FFmpeg berjalan di laptop. Laptop serta Docker Desktop harus menyala selama antrean diproses. Tidak ada server worker cloud pada tahap trial.
+
+1. Clone/download branch `feature/content-factory-v1`.
+2. Salin `.env.example` menjadi `.env`.
+3. Isi secret di `.env` lokal; jangan upload atau commit file tersebut.
+4. Jalankan:
 
 ```sh
 docker build -f worker/Dockerfile -t genz-factory .
-docker run --name genz-factory --restart unless-stopped --env-file .env genz-factory
+docker run --name genz-factory --env-file .env genz-factory
 ```
 
-Isi file `.env` dari `.env.example` secara lokal. Python tidak otomatis membaca `.env`; Docker `--env-file` memasukkannya. Untuk menjalankan Python langsung, export env lewat pengelola environment shell yang aman.
+Untuk menjalankan lagi setelah container berhenti: `docker start -a genz-factory`. Jika konfigurasi berubah, hapus container lama dengan `docker rm genz-factory`, lalu jalankan kembali perintah `docker run`.
 
 | Variable worker | Isi |
 | --- | --- |
 | `SUPABASE_URL` | URL project baru |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key backend; tidak boleh masuk Netlify build/browser |
-| `WORKER_OWNER_ID` | UID user yang sudah ada di factory_members |
-| `OPENAI_API_KEY` | Key API project milik pengguna |
-| `OPENAI_TEXT_MODEL` | Default `gpt-4.1-mini` |
-| `OPENAI_TTS_MODEL` | Default `gpt-4o-mini-tts` |
-| `MAX_VIDEOS_PER_DAY` | Default 5 percobaan; termasuk gagal, hari WIB |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key backend; hanya di laptop |
+| `WORKER_OWNER_ID` | UID user yang sudah masuk `factory_members` |
+| `TEXT_PROVIDER` | Default `gemini` |
+| `GEMINI_API_KEY` | Key Google AI Studio |
+| `GEMINI_TEXT_MODEL` | Default `gemini-3.5-flash-lite` |
+| `TTS_PROVIDER` | Default `elevenlabs` |
+| `ELEVENLABS_API_KEY` | Key ElevenLabs trial |
+| `ELEVENLABS_VOICE_ID` | Voice ID yang dipilih |
+| `ELEVENLABS_MODEL_ID` | Default `eleven_multilingual_v2` |
+| `MAX_VIDEOS_PER_DAY` | Default 3 percobaan; termasuk gagal, hari WIB |
 | `POLL_SECONDS` | Default 10 detik |
 
-Jalankan **satu worker per owner**. Queue claim memakai advisory lock dan menolak claim berikutnya selama masih ada job running milik owner tersebut, termasuk antar-container. Gunakan juga hard budget/alert di penyedia API. Tidak ada retry AI otomatis sehingga kegagalan tidak memicu biaya berulang diam-diam.
+Jalankan satu worker per owner. Queue claim memakai advisory lock dan menolak claim berikutnya selama masih ada job running milik owner tersebut. Tidak ada retry AI otomatis sehingga kegagalan tidak menghabiskan kuota berulang diam-diam.
 
 ## 5. Tes satu video dahulu
 
