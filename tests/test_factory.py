@@ -9,7 +9,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
-from worker.factory import parse_feed, fingerprint, public_addresses, fetch_feed, validate_script, captions, ass_time, alignment_words, edge_speech, render, probe
+from worker.factory import parse_feed, fingerprint, public_addresses, fetch_feed, validate_script, captions, ass_time, alignment_words, edge_speech, estimated_words, render, probe
 
 class FactoryTests(unittest.TestCase):
     def setUp(self):
@@ -67,6 +67,13 @@ class FactoryTests(unittest.TestCase):
         self.assertEqual(selected['voice'],'id-ID-ArdiNeural')
         self.assertEqual(audio,b'mp3')
         self.assertEqual(words,[{'word':'Halo','start':1.0,'end':1.5}])
+
+    def test_estimated_word_timing_fallback(self):
+        words=estimated_words('Halo dunia panjang',9)
+        self.assertEqual([word['word'] for word in words],['Halo','dunia','panjang'])
+        self.assertEqual(words[0]['start'],0)
+        self.assertAlmostEqual(words[-1]['end'],9)
+        self.assertTrue(all(word['end']>word['start'] for word in words))
 
     def test_caption_escaping_and_timing(self):
         output=captions([{'word':'{\\an8}test','start':0,'end':1}], 'Judul','Sumber',2)

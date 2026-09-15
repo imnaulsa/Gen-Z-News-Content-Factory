@@ -268,8 +268,19 @@ async def edge_speech(text,voice):
             start=float(chunk['offset'])/10_000_000
             words.append({'word':str(chunk['text']),'start':start,'end':start+float(chunk['duration'])/10_000_000})
     if not audio: raise ValueError('Edge TTS tidak mengembalikan audio.')
-    if not words: raise ValueError('Edge TTS tidak mengembalikan timestamp kata.')
     return bytes(audio),words
+
+def estimated_words(text,duration):
+    """Proportionally time script words when a TTS provider omits word boundaries."""
+    tokens=text.split()
+    if not tokens or duration<=0: raise ValueError('Script atau durasi suara tidak valid untuk caption.')
+    weights=[max(1,len(re.sub(r'\W+','',token))) for token in tokens]
+    total=sum(weights);elapsed=0.0;words=[]
+    for token,weight in zip(tokens,weights):
+        start=duration*elapsed/total
+        elapsed+=weight
+        words.append({'word':token,'start':start,'end':duration*elapsed/total})
+    return words
 
 def transcribe(client,audio):
     boundary='genz'+uuid.uuid4().hex
@@ -329,6 +340,7 @@ def produce(client,job):
         audio,words=synthesize(client,spoken,job['voice'])
         (folder/'voice.mp3').write_bytes(audio)
         duration=float(probe(folder/'voice.mp3')['format']['duration'])
+        if not words: words=estimated_words(spoken,duration)
         if not 15<=duration<=90: raise ValueError('Durasi dubbing di luar 15–90 detik. Buat ulang script.')
         client.update(job,stage='aligning_captions')
         if not words: raise ValueError('Suara tidak memiliki timestamp kata.')
